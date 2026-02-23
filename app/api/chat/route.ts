@@ -42,8 +42,10 @@ export async function POST(request: NextRequest) {
   try {
     const { messages } = await request.json();
 
-    // Window to last 10 messages to cap prompt token growth
-    const windowedMessages = messages.slice(-10);
+    // Window to last 10 messages and strip any extra fields (e.g. usage) that the API rejects
+    const windowedMessages = messages
+      .slice(-10)
+      .map(({ role, content }: { role: string; content: string }) => ({ role, content }));
 
     const response = await groq.chat.completions.create({
       model: MODEL_NAME,
