@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const openai = new OpenAI({
-  apiKey: process.env.CHATBOT_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.CHATBOT_API_KEY ?? "");
 
 const SYSTEM_PROMPT = `Kamu adalah "Ara", Beauty Advisor dari ERHA yang ramah, santai, dan kekinian. Kamu bertugas membantu pelanggan menemukan solusi terbaik untuk masalah kulit mereka, khususnya jerawat dan kulit berminyak, sembari mengenalkan produk ERHA Acneact Acne Cleanser Scrub Beta Plus (ACSBP).
 
@@ -59,29 +57,45 @@ LARANGAN:
 - Jangan gunakan bahasa kaku atau terlalu formal
 `;
 
-export const MODEL_NAME = "gpt-4o-mini";
+export const MODEL_NAME = "gemini-2.0-flash";
 
 export async function POST(request: NextRequest) {
   try {
     const { messages } = await request.json();
 
-    const response = await openai.chat.completions.create({
+    const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-      max_tokens: 400,
-      temperature: 0.85,
+      systemInstruction: SYSTEM_PROMPT,
     });
 
-    const message = response.choices[0].message;
-    const usage = response.usage;
+    const history = messages.slice(0, -1).map(
+      (msg: { role: string; content: string }) => ({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }],
+      })
+    );
+
+    const lastMessage = messages[messages.length - 1];
+
+    const chat = model.startChat({
+      history,
+      generationConfig: {
+        maxOutputTokens: 400,
+        temperature: 0.85,
+      },
+    });
+
+    const result = await chat.sendMessage(lastMessage.content);
+    const geminiResponse = result.response;
+    const usage = geminiResponse.usageMetadata;
 
     return NextResponse.json({
-      message: message.content,
+      message: geminiResponse.text(),
       model: MODEL_NAME,
       usage: {
-        promptTokens: usage?.prompt_tokens ?? 0,
-        completionTokens: usage?.completion_tokens ?? 0,
-        totalTokens: usage?.total_tokens ?? 0,
+        promptTokens: usage?.promptTokenCount ?? 0,
+        completionTokens: usage?.candidatesTokenCount ?? 0,
+        totalTokens: usage?.totalTokenCount ?? 0,
       },
     });
   } catch (error) {
