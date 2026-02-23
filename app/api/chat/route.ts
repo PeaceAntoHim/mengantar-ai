@@ -57,7 +57,7 @@ LARANGAN:
 - Jangan gunakan bahasa kaku atau terlalu formal
 `;
 
-export const MODEL_NAME = "gemini-2.0-flash";
+export const MODEL_NAME = "gemini-2.0-flash-lite";
 
 export async function POST(request: NextRequest) {
   try {
